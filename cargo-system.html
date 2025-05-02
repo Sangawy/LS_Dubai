@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ku-arab" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سیستەمی ژمێریاری کۆمپانیای گواستنەوە</title>
+    
+    <!-- فۆنتی کوردی -->
+    <link href="https://fonts.googleapis.com/css2?family=Amiri&display=swap" rel="stylesheet">
+    
+    <!-- SheetJS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Simple PDF solution for Unicode -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore-compat.js"></script>
+    
+    <!-- ستایلی تایبەت -->
+    <link rel="stylesheet" href="cargo-system.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="company-logo">
+                <h1 class="company-name-ar">جبل الطور للتجارة العامة ش.ذ.م-م</h1>
+                <h2 class="company-name-en">Jabal Al Toor general trading L.L.C</h2>
+            </div>
+            <h1>سیستەمی بەڕێوەبردنی بار</h1>
+            <p>کۆمپانیای گواستنەوە</p>
+        </header>
+        
+        <!-- دابەشکردنی سیستەم بۆ دوو بەش: فاکس و بار -->
+        <div class="system-container">
+            <!-- بەشی فاکسەکان (هەمیشە پیشان دەدرێت) -->
+            <div class="invoice-section-container">
+                <!-- ڕێکخستنی کۆنتێنەر -->
+                <div class="container-settings">
+                    <div class="settings-header">
+                        <h2>ڕێکخستنی کۆنتێنەر</h2>
+                    </div>
+                    <div class="settings-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="container-volume">حەجمی کۆنتێنەر (م³)</label>
+                                <input type="number" id="container-volume" value="68" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="truck-count">ژمارەی تراکەکان</label>
+                                <input type="number" id="truck-count" value="5" min="1">
+                            </div>
+                            <div class="form-group">
+                                <div style="margin-top: 30px;">
+                                    <button class="btn btn-success" onclick="updateContainerSettings()">نوێکردنەوە</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- زیادکردنی فاکس -->
+                <div class="invoice-section">
+                    <div class="invoice-header">
+                        <h2>بەڕێوەبردنی فاکسەکان</h2>
+                    </div>
+                    <div class="invoice-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="invoice-number">ژمارەی فاکس</label>
+                                <input type="number" id="invoice-number" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="invoice-date">بەروار</label>
+                                <input type="date" id="invoice-date">
+                            </div>
+                            <div class="form-group">
+                                <label for="invoice-notes">تێبینی</label>
+                                <input type="text" id="invoice-notes">
+                            </div>
+                            <div class="form-group">
+                                <div style="margin-top: 30px;">
+                                    <button class="btn btn-success" id="create-invoice-btn">دروستکردنی فاکس</button>
+                                    <button class="btn" id="load-invoices-btn">پیشاندانی فاکسەکان</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Delete Invoice Modal -->
+<div class="modal" id="delete-invoice-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">سڕینەوەی فاکس</h3>
+            <span class="close-modal" onclick="closeDeleteInvoiceModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>ئایا دڵنیایت دەتەوێت ئەم فاکسە بسڕیتەوە؟</p>
+            <p id="delete-invoice-number" class="font-bold"></p>
+            <p>تکایە کۆدی سڕینەوە داخڵ بکە:</p>
+            <div class="form-group">
+                <input type="password" id="delete-code" placeholder="کۆدی سڕینەوە">
+            </div>
+            <input type="hidden" id="delete-invoice-id">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" onclick="deleteInvoice()">سڕینەوە</button>
+            <button class="btn" onclick="closeDeleteInvoiceModal()">هەڵوەشاندنەوە</button>
+        </div>
+    </div>
+</div>
+                <!-- داشبۆرد -->
+                <div class="dashboard" id="current-invoice-dashboard" style="display: none;">
+                    <div class="dashboard-card">
+                        <h3>فاکسی ئێستا</h3>
+                        <p id="current-invoice">--</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>کۆی بارەکان</h3>
+                        <p id="total-cargo">0</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>کۆی حەجم (م³)</h3>
+                        <p id="total-volume">0</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>کۆی وەزن (کگم)</h3>
+                        <p id="total-weight">0</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>حەجمی ماوە (م³)</h3>
+                        <p id="remaining-volume">0</p>
+                    </div>
+                </div>
+                
+                <!-- لیستی فاکسەکان -->
+                <div class="invoice-list">
+                    <h3>لیستی فاکسەکان</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ژمارەی فاکس</th>
+                                <th>بەروار</th>
+                                <th>کۆی تراکەکان</th>
+                                <th>کۆی حەجم (م³)</th>
+                                <th>کۆی وەزن (کگم)</th>
+                                <th>باری فاکس</th>
+                                <th>تێبینی</th>
+                                <th>کردارەکان</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoice-table-body">
+                            <!-- Invoice data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- بەشی بارەکان (تەنها کاتێک فاکسێک هەڵبژێردراوە پیشان دەدرێت) -->
+            <div class="cargo-section-container" id="cargo-section-container" style="display: none;">
+                <!-- زیادکردنی بار -->
+                <div class="form-section">
+                    <div class="form-header">
+                        <h2>زیادکردنی بار</h2>
+                    </div>
+                    <div class="form-content">
+                        <form id="cargo-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="full-name">ناوی سیانی</label>
+                                    <input type="text" id="full-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="brand">مارکە</label>
+                                    <div class="input-group">
+                                        <input type="text" id="brand" list="brandOptions" required onchange="customerSelected()" autocomplete="off">
+                                        <button type="button" class="btn btn-sm btn-primary" onclick="showAddBrandModal()">+</button>
+                                    </div>
+                                    <datalist id="brandOptions">
+                                        <!-- Options will be loaded from Firestore -->
+                                    </datalist>
+                                </div>
+                                <div class="form-group">
+                                    <label for="carton-number">ژمارەی کارتۆن</label>
+                                    <input type="number" id="carton-number" required min="1">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="cargo-type">جۆری کاڵا</label>
+                                    <input type="text" id="cargo-type" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="weight">وەزن (کگم)</label>
+                                    <input type="number" id="weight" required min="0" step="0.01">
+                                </div>
+                                <div class="form-group">
+                                    <label for="volume">حەجم (م³)</label>
+                                    <input type="number" id="volume" required min="0" step="0.01">
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-success">زیادکردن</button>
+                                <button type="reset" class="btn btn-danger">پاککردنەوە</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- لیستی بارەکان -->
+                <div class="cargo-list">
+                    <div class="cargo-header">
+                        <h2>لیستی بارەکان</h2>
+                        <div class="export-buttons">
+                            <button class="export-btn excel" onclick="exportToExcel()">
+                                <i>📊</i> ئێکسپۆرت بۆ ئێکسڵ
+                            </button>
+                            <button class="export-btn pdf" onclick="exportToPDF()">
+                                <i>📄</i> ئێکسپۆرت بۆ PDF
+                            </button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>ناوی سیانی</th>
+                                <th>مارکە</th>
+                                <th>ژ. کارتۆن</th>
+                                <th>جۆری کاڵا</th>
+                                <th>وەزن (کگم)</th>
+                                <th>حەجم (م³)</th>
+                                <th>کردارەکان</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cargo-table-body">
+                            <tr>
+                                <td colspan="8" class="empty-message">هیچ بارێک نییە</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- دابەشکردنی حەجم -->
+                <div class="distribution-section">
+                    <div class="distribution-header">
+                        <h2>دابەشکردنی حەجم بەسەر تراکەکان</h2>
+                    </div>
+                    <div class="distribution-content">
+                        <p>کۆی حەجمی کۆنتێنەر: <span id="container-volume-display">68</span> م³</p>
+                        <p>حەجمی داگیرکراو: <span id="occupied-volume">0</span> م³</p>
+                        <p>حەجمی ماوە بۆ دابەشکردن: <span id="distribute-volume">0</span> م³</p>
+                        
+                        <button class="btn" onclick="distributeRemainingVolume()">دابەشکردنی حەجمی ماوە</button>
+                        
+                        <div class="truck-distribution" id="truck-distribution">
+                            <!-- Truck distribution will be added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Edit Cargo Modal -->
+        <div class="modal" id="edit-cargo-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">دەستکاریکردنی بار</h3>
+                    <span class="close-modal" onclick="closeEditModal()">&times;</span>
+                </div>
+                <form id="edit-cargo-form">
+                    <input type="hidden" id="edit-cargo-id">
+                    <div class="form-group">
+                        <label for="edit-full-name">ناوی سیانی</label>
+                        <input type="text" id="edit-full-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-brand">مارکە</label>
+                        <div class="input-group">
+                            <input type="text" id="edit-brand" list="editBrandOptions" required onchange="editCustomerSelected()" autocomplete="off">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="showAddBrandModal()">+</button>
+                        </div>
+                        <datalist id="editBrandOptions">
+                            <!-- Options will be loaded from Firestore -->
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-carton-number">ژمارەی کارتۆن</label>
+                        <input type="number" id="edit-carton-number" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-cargo-type">جۆری کاڵا</label>
+                        <input type="text" id="edit-cargo-type" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-weight">وەزن (کگم)</label>
+                        <input type="number" id="edit-weight" required min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-volume">حەجم (م³)</label>
+                        <input type="number" id="edit-volume" required min="0" step="0.01">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn">نوێکردنەوە</button>
+                        <button type="button" class="btn btn-danger" onclick="closeEditModal()">هەڵوەشاندنەوە</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Add New Customer Modal -->
+        <div class="modal" id="add-brand-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">زیادکردنی کڕیاری نوێ</h3>
+                    <span class="close-modal" onclick="closeAddBrandModal()">&times;</span>
+                </div>
+                <form id="add-brand-form">
+                    <div class="form-group">
+                        <label for="new-brand-logo">کۆدی لۆگۆ:</label>
+                        <input type="text" id="new-brand-logo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-brand-name">ناوی کڕیار:</label>
+                        <input type="text" id="new-brand-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-brand-name-en">ناوی کڕیار بە ئینگلیزی:</label>
+                        <input type="text" id="new-brand-name-en" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-brand-mobile">مۆبایل:</label>
+                        <input type="text" id="new-brand-mobile" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-success">زیادکردن</button>
+                        <button type="button" class="btn btn-danger" onclick="closeAddBrandModal()">هەڵوەشاندنەوە</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Hidden div for PDF Export -->
+        <div id="pdf-export" style="display: none; direction: rtl; font-family: Arial, Tahoma, sans-serif;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="font-size: 22px; margin-bottom: 5px;">جبل الطور للتجارة العامة ش.ذ.م-م</h1>
+                <h2 style="font-size: 18px; margin-bottom: 15px;">Jabal Al Toor general trading L.L.C</h2>
+                <h3 style="font-size: 20px; margin-bottom: 10px;">لیستی بارەکان - کۆمپانیای گواستنەوە</h3>
+                <p id="pdf-date" style="font-size: 14px;"></p>
+            </div>
+            
+            <div id="pdf-invoice-info" style="margin-bottom: 20px; text-align: right; padding: 0 20px;">
+                <!-- Invoice info will be added here dynamically -->
+            </div>
+            
+            <div style="margin-bottom: 20px; padding: 10px 20px; background-color: #f9f9f9; border-radius: 5px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <p id="pdf-total-cargo" style="margin-bottom: 5px;"></p>
+                    <p id="pdf-truck-count" style="margin-bottom: 5px;"></p>
+                    <p id="pdf-total-volume" style="margin-bottom: 5px;"></p>
+                    <p id="pdf-remaining-volume" style="margin-bottom: 5px;"></p>
+                    <p id="pdf-total-weight" style="margin-bottom: 5px;"></p>
+                </div>
+            </div>
+            
+            <table id="pdf-table" style="width: 100%; border-collapse: collapse; direction: rtl;">
+                <thead>
+                    <tr style="background-color: #3498db; color: white;">
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">#</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">ناوی سیانی</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">مارکە</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">ژ. کارتۆن</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">جۆری کاڵا</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">وەزن (کگم)</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">حەجم (م³)</th>
+                    </tr>
+                </thead>
+                <tbody id="pdf-table-body">
+                    <!-- Table content will be added dynamically -->
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 30px; text-align: center; color: #777;">
+                <p>جبل الطور للتجارة العامة ش.ذ.م-م</p>
+                <p>Jabal Al Toor general trading L.L.C</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- سکریپتی تایبەت -->
+    <script src="cargo-system.js"></script>
+</body>
+</html>
